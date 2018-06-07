@@ -140,15 +140,12 @@ public final class ImageLoader extends Thread {
     }
 
     private void save(ArrayList<BufferedImage> list) {
-        service.submit(() -> {
-            try {
-                Runnable runnable = DB.INSTANCE.putImage(list);
-                CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(runnable, service);
-                voidCompletableFuture.thenAccept(v -> saveDone());
-            } catch (IOException | SQLException e) {
-                e.printStackTrace();
-            }
-        });
-
+        try {
+            Runnable runnable = DB.INSTANCE.putImage(list);
+            CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(runnable, service);
+            voidCompletableFuture.thenAccept(v -> saveDone());
+        } catch (IOException | SQLException e) {
+            e.printStackTrace();
+        }
     }
 }
