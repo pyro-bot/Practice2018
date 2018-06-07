@@ -29,6 +29,7 @@ public class DB implements Closeable {
     private static final String YES = "Y";
     private static final String NO = "N";
 
+    private boolean contentExist = false;
 
     private Connection connection;
     private PreparedStatement putImageStatement;
@@ -80,28 +81,30 @@ public class DB implements Closeable {
     }
 
     public BufferedImage getImage() throws IOException, SQLException {
+        if (!contentExist) return null;
         InputStream content = currentSet.getBinaryStream(CONTENT);
         return ImageIO.read(content);
 
     }
 
     public void next(boolean good) throws SQLException {
-        if (good) {
-            currentSet.updateInt(YES, currentSet.getInt(YES) + 1);
-        } else {
-            currentSet.updateInt(NO, currentSet.getInt(NO) + 1);
-        }
+        if (contentExist)
+            if (good) {
+                currentSet.updateInt(YES, currentSet.getInt(YES) + 1);
+            } else {
+                currentSet.updateInt(NO, currentSet.getInt(NO) + 1);
+            }
         next();
     }
 
 
     private void next() throws SQLException {
-        if (currentSet != null) {
+        if (currentSet != null && contentExist) {
             currentSet.updateRow();
             connection.commit();
         }
         currentSet = getFewerVotesImageStatement.executeQuery();
-        currentSet.first();
+        contentExist = currentSet.first();
     }
 
 
