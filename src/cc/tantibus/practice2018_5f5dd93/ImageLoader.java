@@ -10,6 +10,8 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.concurrent.*;
+import java.util.function.Function;
 
 
 /**
@@ -35,6 +37,8 @@ public final class ImageLoader extends Thread {
 
     public static int saves() { return savesCount; }
 
+    private ExecutorService service;
+
     private ImageInputStream stream;
     private ImageReadParam param;
     private ImageReader reader;
@@ -50,6 +54,8 @@ public final class ImageLoader extends Thread {
 
     private ImageLoader(String path, int width, int height, int chunkWidth, int chunkHeight) throws IOException {
         super("ImageLoader");
+
+        this.service = Executors.newFixedThreadPool(10);
 
         this.stream = ImageIO.createImageInputStream(new File(path));
 
@@ -105,7 +111,10 @@ public final class ImageLoader extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+
         imageDone();
+        service.shutdown();
     }
 
 
@@ -131,17 +140,15 @@ public final class ImageLoader extends Thread {
     }
 
     private void save(ArrayList<BufferedImage> list) {
-        new Thread(() -> {
+        service.submit(() -> {
             try {
-                Thread thread = DB.INSTANCE.putImage(list);
-                thread.start();
-                thread.join();
-            } catch (IOException | SQLException | InterruptedException e) {
+                Runnable runnable = DB.INSTANCE.putImage(list);
+                CompletableFuture<Void> voidCompletableFuture = CompletableFuture.runAsync(runnable, service);
+                voidCompletableFuture.thenAccept(v -> saveDone());
+            } catch (IOException | SQLException e) {
                 e.printStackTrace();
             }
-
-            saveDone();
-        }).start();
+        });
 
     }
 }

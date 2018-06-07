@@ -55,44 +55,29 @@ public enum DB {
 
     }
 
-    Thread putImage(BufferedImage image) throws IOException, SQLException {
+    Runnable putImage(BufferedImage image) throws IOException, SQLException {
         return putImage(Collections.singleton(image));
     }
 
-    Thread putImage(Collection<BufferedImage> images) throws IOException, SQLException {
-        return new Thread(() -> {
+    Runnable putImage(Collection<BufferedImage> images) throws IOException, SQLException {
+        return () -> {
             try {
                 CallableStatement putImageStatement;
                 synchronized (this) {
                     putImageStatement = connection.prepareCall(PUT_IMAGE);
                 }
-                ArrayList<Thread> pool = new ArrayList<>();
-
                 for (BufferedImage image : images) {
-                    Thread thread = new Thread(() -> {
-                        try {
-                            ByteArrayOutputStream os = new ByteArrayOutputStream();
-                            ImageIO.write(image, "png", os);
-                            InputStream is = new ByteArrayInputStream(os.toByteArray());
-                            putImageStatement.setBinaryStream(1, is);
-                            putImageStatement.addBatch();
-
-                        } catch (IOException | SQLException e) {
-                            e.printStackTrace();
-                        }
-                    });
-
-                    thread.start();
-                    pool.add(thread);
-                }
-
-                pool.forEach(t -> {
                     try {
-                        t.join();
-                    } catch (InterruptedException e) {
+                        ByteArrayOutputStream os = new ByteArrayOutputStream();
+                        ImageIO.write(image, "png", os);
+                        InputStream is = new ByteArrayInputStream(os.toByteArray());
+                        putImageStatement.setBinaryStream(1, is);
+                        putImageStatement.addBatch();
+
+                    } catch (IOException | SQLException e) {
                         e.printStackTrace();
                     }
-                });
+                }
                 synchronized (this) {
                     putImageStatement.executeBatch();
                 }
@@ -100,7 +85,7 @@ public enum DB {
             } catch (SQLException e) {
                 e.printStackTrace();
             }
-        });
+        };
     }
 
     public BufferedImage getImage() throws IOException, SQLException {
