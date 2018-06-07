@@ -22,7 +22,7 @@ public class DB implements Closeable {
             "    N INT NOT NULL" +
             ");";
     private static final String PUT_IMAGE = "INSERT INTO PUBLIC.IMG(CONTENT,Y,N) VALUES (?,0,0)";
-    private static final String GET_FEVER_VOTES = "SELECT * FROM PUBLIC.IMG ORDER BY Y + N ASC";
+    private static final String GET_FEVER_VOTES = "SELECT * FROM PUBLIC.IMG ORDER BY Y + N ASC LIMIT 1";
 
 
     private static final String CONTENT = "CONTENT";
