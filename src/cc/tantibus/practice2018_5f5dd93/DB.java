@@ -5,11 +5,15 @@ import java.awt.image.BufferedImage;
 
 import java.io.*;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
 /**
  * 0da - 07.06.2018.
  */
-public class DB implements Closeable {
+public enum DB {
+    INSTANCE;
     private static final String DB_URL = "jdbc:h2:./db";
     private static final String DB_USER = "root";
     private static final String DB_PASS = "root";
@@ -32,52 +36,71 @@ public class DB implements Closeable {
     private boolean contentExist = false;
 
     private Connection connection;
-    private PreparedStatement putImageStatement;
     private PreparedStatement getFewerVotesImageStatement;
     private ResultSet currentSet;
 
-    public DB() {
+
+    public void init() throws SQLException {
         org.h2.Driver.load();
-        try {
-            connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+
+        connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
 
         try (CallableStatement statement = connection.prepareCall(INIT_TABLE)) {
             statement.execute();
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage());
         }
 
-        try {
-            putImageStatement = connection.prepareStatement(PUT_IMAGE);
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage());
-        }
-        try {
-            getFewerVotesImageStatement = connection.prepareStatement(GET_FEVER_VOTES, ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        getFewerVotesImageStatement = connection.prepareStatement(GET_FEVER_VOTES, ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE);
 
-        try {
-            next();
-        } catch (SQLException e) {
-            throw new RuntimeException(e.getMessage());
-        }
+        next();
 
     }
 
+    Thread putImage(BufferedImage image) throws IOException, SQLException {
+        return putImage(Collections.singleton(image));
+    }
 
-    public void putImage(BufferedImage image) throws IOException, SQLException {
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", os);
-        InputStream is = new ByteArrayInputStream(os.toByteArray());
+    Thread putImage(Collection<BufferedImage> images) throws IOException, SQLException {
+        return new Thread(() -> {
+            try {
+                CallableStatement putImageStatement;
+                synchronized (this) {
+                    putImageStatement = connection.prepareCall(PUT_IMAGE);
+                }
+                ArrayList<Thread> pool = new ArrayList<>();
 
-        putImageStatement.setBinaryStream(1, is);
-        putImageStatement.execute();
+                for (BufferedImage image : images) {
+                    Thread thread = new Thread(() -> {
+                        try {
+                            ByteArrayOutputStream os = new ByteArrayOutputStream();
+                            ImageIO.write(image, "png", os);
+                            InputStream is = new ByteArrayInputStream(os.toByteArray());
+                            putImageStatement.setBinaryStream(1, is);
+                            putImageStatement.addBatch();
 
+                        } catch (IOException | SQLException e) {
+                            e.printStackTrace();
+                        }
+                    });
+
+                    thread.start();
+                    pool.add(thread);
+                }
+
+                pool.forEach(t -> {
+                    try {
+                        t.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                });
+                synchronized (this) {
+                    putImageStatement.executeBatch();
+                }
+                putImageStatement.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     public BufferedImage getImage() throws IOException, SQLException {
@@ -108,14 +131,12 @@ public class DB implements Closeable {
     }
 
 
-    @Override
-    public void close() throws IOException {
+    public void close() {
         try {
-            putImageStatement.close();
             getFewerVotesImageStatement.close();
             connection.close();
         } catch (SQLException e) {
-            throw new IOException(e.getMessage());
+            e.printStackTrace();
         }
     }
 }
