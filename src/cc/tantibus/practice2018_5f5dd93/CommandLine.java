@@ -1,5 +1,8 @@
 package cc.tantibus.practice2018_5f5dd93;
 
+import javafx.application.Application;
+
+import java.io.File;
 import java.sql.SQLException;
 
 /**
@@ -24,6 +27,7 @@ public class CommandLine {
             return;
         }
 
+
         try {
             DB.INSTANCE.init();
         } catch (SQLException e) {
@@ -33,9 +37,21 @@ public class CommandLine {
 
         System.out.println("===============================");
 
-        for (int i = 4; i < args.length; i++) {
-            System.out.println(i - 3 + ": " + args[i]);
-            ImageLoader.load(tileWidth, tileHeight, chunkWidth, chunkHeight, args[i]);
+        if (args[4].equals("-file_chooser")) {
+            Application.launch(FileChooserDialog.class);
+
+            int i = 1;
+            for (File file : FileChooserDialog.files) {
+                System.out.println(i + ": " + file.getPath());
+                ImageLoader.load(tileWidth, tileHeight, chunkWidth, chunkHeight, file.getPath());
+                i++;
+            }
+
+        } else {
+            for (int i = 4; i < args.length; i++) {
+                System.out.println(i - 3 + ": " + args[i]);
+                ImageLoader.load(tileWidth, tileHeight, chunkWidth, chunkHeight, args[i]);
+            }
         }
 
         int x = 0;
@@ -64,15 +80,16 @@ public class CommandLine {
     }
 
     private static void explain() {
-
-
+        System.out.println("===============================");
         System.out.println("Params:");
         System.out.println("1: Tile width");
         System.out.println("2: Tile height");
         System.out.println("3: Chunk width");
         System.out.println("4: Chunk height");
+        System.out.println("5: -file_chooser");
+        System.out.println("    or          ");
         System.out.println("5..n: Image paths");
-
+        System.out.println("===============================");
         System.exit(0);
     }
 }
