@@ -1,0 +1,1 @@
+java -jar Practice2018.jar 640 480 15000 1000 %1
