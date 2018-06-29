@@ -23,13 +23,13 @@ public final class ImageLoader extends Thread {
 
     private static synchronized void addCount(int i) { imageCount++; chunkCount += i;}
 
-    private static synchronized void addSave(int count) { savesCount+=count; }
+    private static synchronized void addSave(int count) { savesCount += count; }
 
     private static synchronized void imageDone() { imageCount--; }
 
     private static synchronized void chunkDone() { chunkCount--; }
 
-    private static synchronized void saveDone(int count) { savesCount-=count; }
+    private static synchronized void saveDone(int count) { savesCount -= count; }
 
     public static int image() { return imageCount; }
 
@@ -83,6 +83,14 @@ public final class ImageLoader extends Thread {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    public static void load(int width, int height, int chunkWidth, int chunkHeight, String path) {
+        try {
+            new ImageLoader(path, width, height, chunkWidth, chunkHeight).start();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
