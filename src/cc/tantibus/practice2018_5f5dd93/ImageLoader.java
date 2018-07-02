@@ -101,15 +101,14 @@ public final class ImageLoader extends Thread {
     }
 
 
-    public static void load(int width, int height, int chunkWidth, int chunkHeight, String path) {
-        File file = new File(path);
+    public static void load(int width, int height, int chunkWidth, int chunkHeight, File file) {
         if (file.exists()) {
             try {
                 deque.add(new ImageLoader(file, width, height, chunkWidth, chunkHeight));
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } else System.out.println("File does not exist: " + path);
+        } else System.out.println("File does not exist: " + file.getAbsoluteFile());
     }
 
 
