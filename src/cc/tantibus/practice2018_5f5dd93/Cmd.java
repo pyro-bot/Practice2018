@@ -62,6 +62,11 @@ public class Cmd {
                 .desc("open file chooser")
                 .build();
 
+        Option pixelArrayOption = Option.builder("p")
+                .longOpt("pixel-array")
+                .desc("save tiles as pixel array[r, g, b, a, r1, g1, b1, ...][unsigned byte]")
+                .build();
+
         Option helpOption = Option.builder("h")
                 .longOpt("help")
                 .desc("print this message")
@@ -76,6 +81,7 @@ public class Cmd {
         options.addOption(chunkHeightOption);
         options.addOption(fileOption);
         options.addOption(fileChooserOption);
+        options.addOption(pixelArrayOption);
         options.addOption(helpOption);
 
 
@@ -88,6 +94,8 @@ public class Cmd {
                 helpFormatter.printHelp("ImageCutter", options);
                 return;
             }
+
+            if (commandLine.hasOption('p')) DB.INSTANCE.setSaveFormatToPixelArray(true);
 
             int tileWidth = ((Number) commandLine.getParsedOptionValue("tile-width")).intValue();
             int tileHeight = ((Number) commandLine.getParsedOptionValue("tile-height")).intValue();

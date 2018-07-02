@@ -19,7 +19,7 @@ import java.util.concurrent.*;
  */
 public final class ImageLoader extends Thread {
 
-    private static Deque<ImageLoader> deque = new ArrayDeque<>();
+    private static final Deque<ImageLoader> deque = new ArrayDeque<>();
 
     private static boolean imageInProcess = false;
     private static int savesCount = 0;
@@ -44,14 +44,14 @@ public final class ImageLoader extends Thread {
     private ImageReadParam param;
     private ImageReader reader;
 
-    private int width;
-    private int height;
+    private final int width;
+    private final int height;
 
-    private int chunkHeight;
-    private int chunkWidth;
+    private final int chunkHeight;
+    private final int chunkWidth;
 
-    private int sourceWidth;
-    private int sourceHeight;
+    private final int sourceWidth;
+    private final int sourceHeight;
 
     static Runnable queueThread() {
         return () -> {
