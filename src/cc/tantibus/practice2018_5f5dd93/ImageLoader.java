@@ -8,7 +8,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.concurrent.*;
 
 
@@ -17,23 +19,22 @@ import java.util.concurrent.*;
  */
 public final class ImageLoader extends Thread {
 
-    private static int imageCount = 0;
-    private static int chunkCount = 0;
+    private static Deque<ImageLoader> deque = new ArrayDeque<>();
+
+    private static boolean imageInProcess = false;
     private static int savesCount = 0;
 
-    private static synchronized void addCount(int i) { imageCount++; chunkCount += i;}
+    private static synchronized void setImageInProcess(boolean imageInProcess) {
+        ImageLoader.imageInProcess = imageInProcess;
+    }
 
     private static synchronized void addSave(int count) { savesCount += count; }
 
-    private static synchronized void imageDone() { imageCount--; }
-
-    private static synchronized void chunkDone() { chunkCount--; }
-
     private static synchronized void saveDone(int count) { savesCount -= count; }
 
-    public static int image() { return imageCount; }
+    public static int queue() { return deque.size(); }
 
-    public static int chunk() { return chunkCount; }
+    public static boolean image() { return imageInProcess; }
 
     public static int saves() { return savesCount; }
 
@@ -52,12 +53,42 @@ public final class ImageLoader extends Thread {
     private int sourceWidth;
     private int sourceHeight;
 
-    private ImageLoader(String path, int width, int height, int chunkWidth, int chunkHeight) throws IOException {
+    static Runnable queueThread() {
+        return () -> {
+            while (deque.size() > 0) {
+                ImageLoader temp = deque.poll();
+                if (temp == null) continue;
+                // TODO: 02.07.2018 Better memory management
+
+                long usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+
+                while (Runtime.getRuntime().maxMemory() < usedMemory * 2 || image()) {
+                    usedMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+                    try {
+                        TimeUnit.SECONDS.sleep(5);
+                        System.gc();
+                        System.out.print('*');
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                setImageInProcess(true);
+                temp.start();
+            }
+        };
+    }
+
+    private ImageLoader(File file, int width, int height, int chunkWidth, int chunkHeight) throws IOException {
         super("ImageLoader");
-
         this.service = Executors.newFixedThreadPool(5);
+        this.width = width;
+        this.height = height;
+        this.chunkWidth = chunkWidth;
+        this.chunkHeight = chunkHeight;
 
-        this.stream = ImageIO.createImageInputStream(new File(path));
+        /////////////////////////////////////////////////////////////////////////////////////
+        this.stream = ImageIO.createImageInputStream(file);
 
         this.reader = ImageIO.getImageReaders(stream).next();
         this.reader.setInput(stream, false, true);
@@ -65,34 +96,22 @@ public final class ImageLoader extends Thread {
         this.sourceWidth = reader.getWidth(0);
         this.sourceHeight = reader.getHeight(0);
         this.param = reader.getDefaultReadParam();
+        /////////////////////////////////////////////////////////////////////////////////////
 
-        this.width = width;
-        this.height = height;
-        this.chunkWidth = chunkWidth;
-        this.chunkHeight = chunkHeight;
-
-        int chunkXCount = sourceWidth / chunkWidth + (sourceWidth % chunkWidth == 0 ? 0 : 1);
-        int chunkYCount = sourceHeight / chunkHeight + (sourceHeight % chunkHeight == 0 ? 0 : 1);
-        addCount(chunkXCount * chunkYCount);
     }
 
-    public static void load(int width, int height, int chunkWidth, int chunkHeight, String... paths) {
-        for (String path : paths) {
+
+    public static void load(int width, int height, int chunkWidth, int chunkHeight, String path) {
+        File file = new File(path);
+        if (file.exists()) {
             try {
-                new ImageLoader(path, width, height, chunkWidth, chunkHeight).start();
+                deque.add(new ImageLoader(file, width, height, chunkWidth, chunkHeight));
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+        } else System.out.println("File does not exist: " + path);
     }
 
-    public static void load(int width, int height, int chunkWidth, int chunkHeight, String path) {
-        try {
-            new ImageLoader(path, width, height, chunkWidth, chunkHeight).start();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
     @Override
     public void run() {
@@ -106,7 +125,6 @@ public final class ImageLoader extends Thread {
                     param.setSourceRegion(new Rectangle(x, y, tempW, tempH));
                     BufferedImage result = reader.read(0, param);
                     cutImage(result, width, height);
-                    chunkDone();
 
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -121,14 +139,13 @@ public final class ImageLoader extends Thread {
         }
 
 
-        imageDone();
+        setImageInProcess(false);
         service.shutdown();
     }
 
 
     private void cutImage(BufferedImage source, int width, int height) {
         ArrayList<BufferedImage> result = new ArrayList<>();
-
 
         int sourceWidth = source.getWidth();
         int sourceHeight = source.getHeight();
@@ -157,7 +174,6 @@ public final class ImageLoader extends Thread {
     }
 
     private void save(ArrayList<BufferedImage> list) {
-
         int size = list.size();
         addSave(size);
         Runnable runnable = DB.INSTANCE.putImage(list);

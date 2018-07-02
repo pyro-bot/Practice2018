@@ -35,36 +35,34 @@ public class CommandLine {
             return;
         }
 
-        System.out.println("===============================");
+        System.out.println("\n===============================");
 
         if (args[4].equals("-file_chooser")) {
             Application.launch(FileChooserDialog.class);
-
-            int i = 1;
             for (File file : FileChooserDialog.files) {
-                System.out.println(i + ": " + file.getPath());
                 ImageLoader.load(tileWidth, tileHeight, chunkWidth, chunkHeight, file.getPath());
-                i++;
             }
 
         } else {
             for (int i = 4; i < args.length; i++) {
-                System.out.println(i - 3 + ": " + args[i]);
                 ImageLoader.load(tileWidth, tileHeight, chunkWidth, chunkHeight, args[i]);
             }
         }
 
-        int x = 0;
-        int y = 0;
+        new Thread(ImageLoader.queueThread()).start();
+
+        boolean x = true;
         int z = 0;
-        while (ImageLoader.image() + ImageLoader.chunk() + ImageLoader.saves() > 0) {
-            if (x != ImageLoader.image() || y != ImageLoader.chunk() || z != ImageLoader.saves()) {
+        int q = 0;
+
+        while (ImageLoader.queue() + ImageLoader.saves() > 0 || ImageLoader.image()) {
+            if (q != ImageLoader.queue() || x != ImageLoader.image() || z != ImageLoader.saves()) {
+                q = ImageLoader.queue();
                 x = ImageLoader.image();
-                y = ImageLoader.chunk();
                 z = ImageLoader.saves();
-                System.out.println("===============================");
+                System.out.println("\n===============================");
+                System.out.println("Image in queue:   " + q);
                 System.out.println("Image in process: " + x);
-                System.out.println("Chunk in process: " + y);
                 System.out.println("Tiles to save   : " + z);
             }
 
@@ -76,7 +74,7 @@ public class CommandLine {
         }
 
         DB.INSTANCE.close();
-        System.out.println("=========== SUCCESS ===========");
+        System.out.println("\n=========== SUCCESS ===========");
     }
 
     private static void explain() {
