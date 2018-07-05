@@ -68,7 +68,6 @@ public enum DB implements Closeable {
                             int[] data = dataBuffer.getData();
                             byte[] bytes = new byte[data.length * 4];
                             for (int i = 0; i < data.length; i++) {
-                                bytes[i] = (byte) data[i];
                                 bytes[i + 0] = (byte) ((data[i] >> 16) & 0xff); // red
                                 bytes[i + 1] = (byte) ((data[i] >> 8) & 0xff);  // green
                                 bytes[i + 2] = (byte) ((data[i]) & 0xff);       // blue
