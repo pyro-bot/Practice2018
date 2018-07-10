@@ -2,8 +2,10 @@ package cc.tantibus.practice2018_5f5dd93;
 
 import com.objectplanet.image.PngEncoder;
 
+import java.awt.*;
 import java.awt.image.BufferedImage;
 
+import java.awt.image.DataBufferInt;
 import java.io.*;
 import java.sql.*;
 import java.util.Collection;
@@ -23,6 +25,7 @@ public enum DB implements Closeable {
             ");";
     private static final String PUT_IMAGE = "INSERT INTO IMG(CONTENT) VALUES (?)";
 
+    private boolean pixelArray = false;
 
     private Connection connection;
 
@@ -42,6 +45,10 @@ public enum DB implements Closeable {
         connection.setAutoCommit(false);
     }
 
+    public void setSaveFormatToPixelArray(boolean flag) {
+        pixelArray = flag;
+    }
+
     Runnable putImage(Collection<BufferedImage> images) {
         return () -> {
             try {
@@ -55,11 +62,23 @@ public enum DB implements Closeable {
                         ImageIO.write(image, "png", os);
                         putImageStatement.setBytes(1, os.toByteArray());
                         */
-
-                        ByteArrayOutputStream os = new ByteArrayOutputStream();
-                        pngEncoder.encode(image, os);
-                        putImageStatement.setBytes(1, os.toByteArray());
-
+                        if (pixelArray) {
+                            BufferedImage argb = convertToARGB(image);
+                            DataBufferInt dataBuffer = (DataBufferInt) argb.getRaster().getDataBuffer();
+                            int[] data = dataBuffer.getData();
+                            byte[] bytes = new byte[data.length * 4];
+                            for (int i = 0; i < data.length; i++) {
+                                bytes[i + 0] = (byte) ((data[i] >> 16) & 0xff); // red
+                                bytes[i + 1] = (byte) ((data[i] >> 8) & 0xff);  // green
+                                bytes[i + 2] = (byte) ((data[i]) & 0xff);       // blue
+                                bytes[i + 3] = (byte) ((data[i] >> 24) & 0xff); // alpha
+                            }
+                            putImageStatement.setBytes(1, bytes);
+                        } else {
+                            ByteArrayOutputStream os = new ByteArrayOutputStream();
+                            pngEncoder.encode(image, os);
+                            putImageStatement.setBytes(1, os.toByteArray());
+                        }
                         putImageStatement.addBatch();
 
                     } catch (SQLException | IOException e) {
@@ -77,6 +96,15 @@ public enum DB implements Closeable {
         };
     }
 
+    private BufferedImage convertToARGB(BufferedImage old) {
+        int w = old.getWidth();
+        int h = old.getHeight();
+        BufferedImage argb = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = argb.createGraphics();
+        g.drawImage(old, 0, 0, w, h, null);
+        g.dispose();
+        return argb;
+    }
 
     @Override
     public void close() {
